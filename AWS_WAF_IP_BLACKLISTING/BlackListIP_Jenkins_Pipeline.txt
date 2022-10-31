@@ -1,0 +1,49 @@
+#!/usr/bin/env groovy
+import java.util.regex.Matcher
+import java.time.LocalDateTime
+import com.cwctravel.hudson.plugins.extended_choice_parameter.ExtendedChoiceParameterDefinition
+import groovy.json.JsonSlurper
+
+def cmdResponse;
+def blackListIp;
+def userNameJenkins;
+def pool = ['a'..'z','A'..'Z',0..9,'_'].flatten();
+def wbVm = "10.1.96.12";
+def blacklistScript = "<<PATH TO addIpToBlacklistWAF.sh>>";
+
+def printWithNoTrace(cmd) {
+	steps.sh (script: '#!/bin/sh -e\n'+ cmd,returnStdout: true)
+}
+  
+node ('<<Node_Name>>') {
+
+	stage("Add IP to blacklist") {
+		deleteDir();
+		wrap([$class: 'BuildUser']) {
+			userNameJenkins = env.BUILD_USER_ID;
+		}
+				
+		blackListIp = input(  
+			   id: 'blackListIp', message: 'Enter IP to blacklist', parameters: [  
+				 [$class: 'TextParameterDefinition', defaultValue: 'x.x.x.x', description: 'Enter IP to blacklist', name: 'blackListIp'],  
+			  ]);
+		if(!blackListIp.contains("/")){
+			blackListIp = blackListIp.concat("/32");
+		}
+		
+		print "Entered IP is: "+blackListIp;
+	}
+	
+	stage("Adding IP to blacklist group") {
+			cmdResponse = printWithNoTrace("bash ${blacklistScript} ${blackListIp}");
+			print "Script response: $cmdResponse";
+
+			if (!cmdResponse.contains("NextLockToken")){
+				error("Execution failed. Check script response above for Error");
+			}
+	}
+	
+	stage("Sending Teams Notification") {
+		office365ConnectorSend color: 'green', message: 'IP('+blackListIp+') blacklisted by '+userNameJenkins, status: 'IP Blacklisted', webhookUrl: '<<TEAMS WEBHOOK URL>>'
+	}
+}
