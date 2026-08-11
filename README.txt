@@ -1,1 +1,1 @@
-All files in this GIT repo are created by me for my automation learning journey.
+All files in this GIT repo are created by me for my automation and AI based learning journey.
